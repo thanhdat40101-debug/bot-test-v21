@@ -13,13 +13,36 @@ CHAT_ID = "6285849261"
 API_MD5 = "https://bottele-production-4be9.up.railway.app/api/history/md5"
 
 # -------------------------------------------------------------
+# BỘ NHẬN DIỆN MÃ MD5 ĐỘNG (BẮT TẤT CẢ CHUỖI HEX 32 KÝ TỰ)
+# -------------------------------------------------------------
+def extract_md5_auto(item):
+    """Tự động tìm mã MD5 trong dict bất kể API đặt tên key là gì"""
+    if not isinstance(item, dict):
+        return "Chưa cập nhật"
+    
+    # 1. Kiểm tra các key phổ biến
+    for key in ['Ma_hash', 'md5', 'hash', 'MD5', 'Ma_md5', 'hash_code', 'code_md5', 'key_md5', 'MD5_hash']:
+        val = item.get(key)
+        if val and isinstance(val, str) and len(val.strip()) == 32:
+            return val.strip()
+
+    # 2. Quét toàn bộ các giá trị trong JSON, hễ là chuỗi Hex 32 ký tự thì lấy
+    for k, v in item.items():
+        if isinstance(v, str):
+            clean_v = v.strip()
+            if len(clean_v) == 32 and all(c in '0123456789abcdefABCDEF' for c in clean_v):
+                return clean_v
+
+    return "Chưa cập nhật"
+
+# -------------------------------------------------------------
 # ENGINE PHÂN TÍCH CHUỖI HEX MD5 & TÍNH XÁC SUẤT
 # -------------------------------------------------------------
 class SmartMD5Engine:
     def parse_md5_deep(self, md5_str):
         """Bóc tách Bitwise 128-bit & Checksum từ mã MD5"""
-        if not md5_str or len(md5_str) < 32 or md5_str == 'N/A':
-            return 50, 50, "Mã MD5 chưa cập nhật - Dùng mặc định"
+        if not md5_str or len(md5_str) != 32 or md5_str == 'Chưa cập nhật':
+            return 50, 50, "Mã MD5 chưa cập nhật từ API - Dùng xác suất mặc định"
 
         try:
             full_int = int(md5_str, 16)
@@ -37,17 +60,17 @@ class SmartMD5Engine:
 
             p_tai = round(max(15, min(85, score_tai)))
             p_xiu = 100 - p_tai
-            ly_do = f"Bitwise: {ones_count}/128 Bit 1 | XOR Checksum: {xor_sum % 100}"
+            ly_do = f"MD5 Bitwise: {ones_count}/128 Bit 1 | Checksum XOR: {xor_sum % 100}"
             return p_tai, p_xiu, ly_do
         except Exception:
-            return 50, 50, "Lỗi phân tích cú pháp MD5"
+            return 50, 50, "Lỗi giải mã chuỗi Hex MD5"
 
     def analyze(self, history):
         data = []
         for p in history:
             if not isinstance(p, dict): continue
             tong = p.get('Tong') or p.get('tong') or 0
-            ma_md5 = p.get('Ma_hash') or p.get('md5') or p.get('hash') or p.get('MD5') or ''
+            ma_md5 = extract_md5_auto(p)
             if tong > 0:
                 is_tai = 1 if tong >= 11 else 0
             else:
@@ -82,7 +105,7 @@ class SmartMD5Engine:
 engine = SmartMD5Engine()
 
 # -------------------------------------------------------------
-# BỘ LƯU TRỮ LỊCH SỬ DỰ ĐOÁN (ĐỂ PHỤC VỤ LỆNH /thongke)
+# BỘ LƯU TRỮ LỊCH SỬ DỰ ĐOÁN (PHỤC VỤ LỆNH /thongke)
 # -------------------------------------------------------------
 history_logs = []
 
@@ -163,7 +186,9 @@ def auto_process():
                     xx3 = curr.get('Xuc_xac_3', 0)
                     tong = curr.get('Tong', 0)
                     kq = str(curr.get('Ket_qua') or curr.get('ketqua') or '')
-                    ma_md5 = curr.get('Ma_hash') or curr.get('md5') or curr.get('hash') or curr.get('MD5') or 'Chưa cập nhật'
+                    
+                    # Gọi hàm nhận diện MD5 tự động
+                    ma_md5 = extract_md5_auto(curr)
 
                     if phien and phien != last_phien:
                         status_eval = ""
@@ -180,7 +205,6 @@ def auto_process():
                                 stats["thua"] += 1
                                 status_eval = "\n ❌ ĐÁNH GIÁ: THUA"
 
-                            # Ghi nhật ký vào bộ lưu trữ cho lệnh /thongke
                             kq_text = "Tài" if tong >= 11 else "Xỉu"
                             dice_format = f"{xx1}-{xx2}-{xx3}"
                             record_game_result(phien, dice_format, tong, kq_text, last_predict, is_win)
@@ -188,7 +212,6 @@ def auto_process():
                         tong_p = stats["thang"] + stats["thua"]
                         rate_win = round((stats["thang"] / tong_p) * 100, 1) if tong_p > 0 else 0
 
-                        # Gọi engine phân tích
                         du_doan, dot, r_tai, r_xiu, do_tin_cay, cau_str, ly_do = engine.analyze(history)
                         phien_next = phien + 1 if isinstance(phien, int) else "N/A"
 
