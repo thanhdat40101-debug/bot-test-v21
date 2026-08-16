@@ -9,7 +9,7 @@ from flask import Flask
 # -------------------------------------------------------------
 # CẤU HÌNH BOT TELEGRAM
 # -------------------------------------------------------------
-BOT_TOKEN = "8463492839:AAGgzUV1a7O_8pzt6ZQ8wFLpTG_GrXFF4qI"
+BOT_TOKEN = "8463492839:AAHXxkyqQpGVHuCz9-vyQg4g6_2wMUv9LKw"
 CHAT_ID = "6285849261"
 API_MD5 = "https://bottele-production-4be9.up.railway.app/api/history/md5"
 
